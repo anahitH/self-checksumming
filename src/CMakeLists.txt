@@ -1,6 +1,8 @@
 add_executable(self-checksumming
     #TODO: add source files
-    test.cpp
+    self_checksum.cpp
+    basic_blocks_collector.cpp
+    self_checksum.cpp
 )
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).
