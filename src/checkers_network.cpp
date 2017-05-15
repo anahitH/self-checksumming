@@ -72,14 +72,6 @@ void detach_node_from_parents(acyclic_cfg::node_type block_node,
     }
 }
 
-void remove_random_blocks(const std::unordered_set<BPatch_basicBlock*>& checker_blocks,
-                          hash_vector<BPatch_basicBlock*>& remaining_blocks)
-{
-    for (const auto& block : checker_blocks) {
-        remaining_blocks.erase(block);
-    }
-}
-
 }
 
 BPatch_basicBlock* checkers_network::node::get_block()
@@ -119,29 +111,28 @@ void checkers_network::build()
     block_collector.collect();
     auto& all_blocks = block_collector.get_basic_blocks();
 
-    auto& leaf_functions = call_graph.get_leaves();
     std::list<acyclic_call_graph::node_type> function_queue;
     std::unordered_set<acyclic_call_graph::node_type> processed_functions;
-    for (auto& leaf_f : leaf_functions) {
-        if (all_blocks.size() <= connectivity_level) {
+    auto& leaf_functions = call_graph.get_leaves();
+    function_queue.insert(function_queue.begin(), leaf_functions.begin(), leaf_functions.end());
+    while (!function_queue.empty()) {
+        if (all_blocks.size() + 1 <= connectivity_level) {
             build_for_remaining_blocks(all_blocks);
             break;
         }
-        function_queue.push_front(leaf_f);
-        while (!function_queue.empty()) {
-            auto function_node = function_queue.back();
-            if (processed_functions.find(function_node) != processed_functions.end()) {
-                continue;
-            }
-            function_queue.pop_back();
-            function_node->build_cfg();
-            auto& function_cfg = function_node->get_cfg();
-            build(function_cfg, all_blocks);
-            processed_functions.insert(function_node);
 
-            const auto& callers = function_node->get_callers();
-            function_queue.insert(function_queue.begin(), callers.begin(), callers.end());
+        auto function_node = function_queue.back();
+        if (processed_functions.find(function_node) != processed_functions.end()) {
+            continue;
         }
+        function_queue.pop_back();
+        function_node->build_cfg();
+        auto& function_cfg = function_node->get_cfg();
+        build(function_cfg, all_blocks);
+        processed_functions.insert(function_node);
+
+        const auto& callers = function_node->get_callers();
+        function_queue.insert(function_queue.begin(), callers.begin(), callers.end());
     }
 }
 
@@ -160,6 +151,7 @@ void checkers_network::build(acyclic_cfg& function_cfg, basic_blocks_collection&
             }
 
             blocks_queue.pop_back();
+            remaining_blocks.erase(block_node->get_block());
             auto block_dominators = block_node->get_parents();
             auto checker_nodes = get_random_nodes(block_dominators, connectivity_level);
             add_dominator_checkers(check_node, checker_nodes);
@@ -168,7 +160,6 @@ void checkers_network::build(acyclic_cfg& function_cfg, basic_blocks_collection&
                 unsigned num = connectivity_level - checker_nodes.size();
                 auto checker_blocks = get_random_blocks(remaining_blocks, num);
                 add_random_checkers(check_node, checker_blocks);
-                remove_random_blocks(checker_blocks, remaining_blocks);
             }
         }
     }
