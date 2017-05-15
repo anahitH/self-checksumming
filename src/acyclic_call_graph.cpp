@@ -72,6 +72,20 @@ std::unordered_set<acyclic_call_graph::node_type>& acyclic_call_graph::get_leave
     return leaves;
 }
 
+const acyclic_call_graph::node_type& acyclic_call_graph::get_function_node(BPatch_function* function) const
+{
+    auto pos = function_nodes.find(function);
+    assert(pos != function_nodes.end());
+    return pos->second;
+}
+
+acyclic_call_graph::node_type& acyclic_call_graph::get_function_node(BPatch_function* function)
+{
+    auto pos = function_nodes.find(function);
+    assert(pos != function_nodes.end());
+    return pos->second;
+}
+
 void acyclic_call_graph::build()
 {
     std::vector<BPatch_function*>* functions_p = module->getProcedures();

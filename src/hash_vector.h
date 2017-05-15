@@ -28,6 +28,9 @@ public:
     bool contains(const T& value) const;
     void clear();
 
+    template <class InputIterator>
+    void push_back(InputIterator first, InputIterator last);
+
 public:
     using std::vector<T>::reserve;
     using std::vector<T>::resize;
@@ -36,7 +39,6 @@ public:
     using std::vector<T>::empty;
     using std::vector<T>::back;
     using std::vector<T>::front;
-    //using std::vector<T>::operator[];
     using std::vector<T>::begin;
     using std::vector<T>::end;
     using std::vector<T>::cbegin;
@@ -121,5 +123,17 @@ void hash_vector<T>::clear()
     std::vector<T>::clear();
     value_index.clear();
 }
+
+template <class T>
+template <class InputIterator>
+void hash_vector<T>::push_back(InputIterator first, InputIterator last)
+{
+    while (first != last) {
+        push_back(*first);
+        ++first;
+    }
+}
+
+
 } // namespace selfchecksum
 

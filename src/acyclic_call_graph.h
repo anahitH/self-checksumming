@@ -51,6 +51,8 @@ public:
 public:
     const std::unordered_set<node_type>& get_leaves() const;
     std::unordered_set<node_type>& get_leaves();
+    const node_type& get_function_node(BPatch_function* function) const;
+    node_type& get_function_node(BPatch_function* function);
 
 private:
     void dump(const node_type& n, unsigned level) const;

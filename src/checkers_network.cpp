@@ -6,6 +6,7 @@
 #include "BPatch.h"
 #include "BPatch_addressSpace.h"
 #include "BPatch_basicBlock.h"
+#include "BPatch_flowGraph.h"
 #include "BPatch_function.h"
 #include "BPatch_image.h"
 #include "BPatch_module.h"
@@ -97,13 +98,13 @@ checkers_network::node::node(BPatch_basicBlock* block)
 checkers_network::checkers_network(BPatch_module* m, unsigned conn_level, const logger& l)
     : module(m)
     , connectivity_level(conn_level)
+    , call_graph(module)
     , log(l)
 {
 }
 
 void checkers_network::build()
 {
-    acyclic_call_graph call_graph(module);
     call_graph.build();
 
     logger log;
@@ -152,7 +153,7 @@ void checkers_network::build(acyclic_cfg& function_cfg, basic_blocks_collection&
 
             blocks_queue.pop_back();
             remaining_blocks.erase(block_node->get_block());
-            auto block_dominators = block_node->get_parents();
+            auto block_dominators = get_dominators(block_node);
             auto checker_nodes = get_random_nodes(block_dominators, connectivity_level);
             add_dominator_checkers(check_node, checker_nodes);
             detach_node_from_parents(block_node, block_dominators, blocks_queue);
@@ -199,6 +200,38 @@ void checkers_network::add_random_checkers(node_type checkee_node,
         checker_node->add_checkee(checkee_node->get_block(), check_checker);
         leaves.erase(checker_node);
     }
+}
+
+hash_vector<acyclic_cfg::node_type> checkers_network::get_dominators(acyclic_cfg::node_type block_node)
+{
+    srand(time(NULL));
+    hash_vector<acyclic_cfg::node_type> dominators;
+    const auto& parents = block_node->get_parents();
+    dominators.push_back(parents.begin(), parents.end());
+
+    BPatch_basicBlock* block = block_node->get_block();
+    BPatch_flowGraph* cfg = block->getFlowGraph();
+    BPatch_function* function = cfg->getFunction();
+    
+    while (dominators.size() < 2 * connectivity_level) {
+        auto function_node = call_graph.get_function_node(function);
+        auto callers = function_node->get_callers();
+        for (auto& caller : callers) {
+            caller->build_cfg();
+            auto& caller_cfg = caller->get_cfg();
+            auto leaves = caller_cfg.get_leaves();
+            unsigned random_index = rand() % leaves.size();
+            auto iter = leaves.begin();
+            while (random_index-- != 0 && ++iter != leaves.end());
+            assert(iter != leaves.end());
+            auto random_leaf = *iter;
+            dominators.push_back(random_leaf);
+            auto random_parents = random_leaf->get_parents();
+            dominators.push_back(random_parents.begin(), random_parents.end());
+        }
+        function = (*callers.begin())->get_function();
+    }
+    return dominators;
 }
 
 
