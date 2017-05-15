@@ -1,8 +1,9 @@
 #include "basic_blocks_collector.h"
 
+#include "logger.h"
+
 #include "BPatch.h"
 #include "BPatch_basicBlock.h"
-#include "BPatch_binaryEdit.h"
 #include "BPatch_flowGraph.h"
 #include "BPatch_function.h"
 #include "BPatch_image.h"
@@ -14,43 +15,35 @@
 
 namespace selfchecksum {
 
-basic_blocks_collector::basic_blocks_collector(BPatch_binaryEdit& bin)
-    : binary(bin)
+basic_blocks_collector::basic_blocks_collector(BPatch_module& m, const logger& l)
+    : module(m)
+    , log(l)
 {
 }
 
-const basic_blocks_collector::basic_blocks_collection& basic_blocks_collector::get_basic_blocks() const
+const basic_blocks_collection& basic_blocks_collector::get_basic_blocks() const
 {
     return basic_blocks;
 }
 
-void basic_blocks_collector::collect()
+basic_blocks_collection& basic_blocks_collector::get_basic_blocks()
 {
-    BPatch_image* appImg = binary.getImage();
-    std::vector<BPatch_module*> modules;
-    appImg->getModules(modules);
-    if (modules.empty()) {
-        return;
-    }
-    unsigned index = 0;
-    for (auto& module : modules) {
-        collect_from_module(module, index);
-    }
-
+    return basic_blocks;
 }
 
-void basic_blocks_collector::collect_from_module(BPatch_module* module, unsigned& index)
+
+void basic_blocks_collector::collect()
 {
-    std::vector<BPatch_function*>* functions = module->getProcedures();
+    std::vector<BPatch_function*>* functions = module.getProcedures();
     if (functions == nullptr) {
         return;
     }
     for (auto& function : *functions) {
-        collect_from_function(function, index);
+        collect_from_function(function);
     }
 }
 
-void basic_blocks_collector::collect_from_function(BPatch_function* function, unsigned& index)
+void basic_blocks_collector::collect_from_function(BPatch_function* function)
 {
     BPatch_flowGraph* cfg = function->getCFG();
     if (cfg == nullptr) {
@@ -59,13 +52,24 @@ void basic_blocks_collector::collect_from_function(BPatch_function* function, un
     std::set<BPatch_basicBlock*> blocks;
     cfg->getAllBasicBlocks(blocks);
     for (auto& bb : blocks) {
-        basic_blocks[index++] = bb;
+        basic_blocks.push_back(bb);
+        BPatch_Set<BPatch_basicBlock*> post_dominates;
+        bb->getAllDominates(post_dominates);
+        if (function->getName() == "main") {
+            std::cout << "BB: " << bb->getBlockNumber() << "\n";
+            for (const auto& post : post_dominates) {
+                std::cout << "dom: " << post->getBlockNumber() << "\n";
+            }
+        }
+
     }
 }
 
 void basic_blocks_collector::dump() const
 {
-    std::cout << "Total number of basic blocks " << basic_blocks.size() << "\n";
+    std::string msg("Total number of basic blocks ");
+    msg += std::to_string(basic_blocks.size());
+    log.log_message(msg);
 }
 
 }
