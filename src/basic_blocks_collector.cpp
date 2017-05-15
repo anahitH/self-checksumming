@@ -53,15 +53,6 @@ void basic_blocks_collector::collect_from_function(BPatch_function* function)
     cfg->getAllBasicBlocks(blocks);
     for (auto& bb : blocks) {
         basic_blocks.push_back(bb);
-        BPatch_Set<BPatch_basicBlock*> post_dominates;
-        bb->getAllDominates(post_dominates);
-        if (function->getName() == "main") {
-            std::cout << "BB: " << bb->getBlockNumber() << "\n";
-            for (const auto& post : post_dominates) {
-                std::cout << "dom: " << post->getBlockNumber() << "\n";
-            }
-        }
-
     }
 }
 

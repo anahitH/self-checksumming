@@ -213,7 +213,8 @@ hash_vector<acyclic_cfg::node_type> checkers_network::get_dominators(acyclic_cfg
     BPatch_flowGraph* cfg = block->getFlowGraph();
     BPatch_function* function = cfg->getFunction();
     
-    while (dominators.size() < 2 * connectivity_level) {
+    unsigned number_of_tries = rand() % parents.size();
+    while (dominators.size() < 2 * connectivity_level && number_of_tries-- != 0) {
         auto function_node = call_graph.get_function_node(function);
         auto callers = function_node->get_callers();
         for (auto& caller : callers) {
@@ -228,8 +229,8 @@ hash_vector<acyclic_cfg::node_type> checkers_network::get_dominators(acyclic_cfg
             dominators.push_back(random_leaf);
             auto random_parents = random_leaf->get_parents();
             dominators.push_back(random_parents.begin(), random_parents.end());
+            function = caller->get_function();
         }
-        function = (*callers.begin())->get_function();
     }
     return dominators;
 }
