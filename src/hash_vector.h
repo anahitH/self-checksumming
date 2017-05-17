@@ -30,12 +30,13 @@ public:
 
     template <class InputIterator>
     void push_back(InputIterator first, InputIterator last);
+    //unsigned size() const;
 
 public:
     using std::vector<T>::reserve;
     using std::vector<T>::resize;
-    using std::vector<T>::capacity;
     using std::vector<T>::size;
+    using std::vector<T>::capacity;
     using std::vector<T>::empty;
     using std::vector<T>::back;
     using std::vector<T>::front;
@@ -92,6 +93,7 @@ typename hash_vector<T>::iterator hash_vector<T>::erase(unsigned index)
     std::vector<T>::operator[](index) = val;
     value_index[val] = index;
     value_index.erase(old_val);
+    std::vector<T>::pop_back();
 }
 
 template <class T>
@@ -134,6 +136,11 @@ void hash_vector<T>::push_back(InputIterator first, InputIterator last)
     }
 }
 
-
+//template <class T>
+//unsigned hash_vector<T>::size() const
+//{
+//    return value_index.size();
+//}
+//
 } // namespace selfchecksum
 

@@ -43,6 +43,7 @@ public:
     acyclic_cfg(BPatch_function* function);
 
 
+    BPatch_function* get_function();
     const std::unordered_set<node_type>& get_leaves() const;
     std::unordered_set<node_type>& get_leaves();
 

@@ -32,6 +32,7 @@ public:
         const std::unordered_set<node_type>& get_callers() const;
         bool has_callee(BPatch_function* child) const;
         void add_callee(BPatch_function* child);
+        bool is_leaf() const;
 
     private:
         BPatch_function* function;
