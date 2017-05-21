@@ -6,6 +6,7 @@ add_executable(self-checksumming
     self_checksum.cpp
     acyclic_call_graph.cpp
     acyclic_cfg.cpp
+    snippet_inserter.cpp
 )
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).

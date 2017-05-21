@@ -98,17 +98,46 @@ void checkers_network::node::add_checker(node_type checker)
 
 void checkers_network::node::add_checkee(BPatch_basicBlock* block, bool check_checker)
 {
-    block_checkees.push_back(std::make_pair(block, check_checker));
+    block_checkees[block] = check_checker;
 }
 
-const std::vector<checkers_network::node::checkee_data>& checkers_network::node::get_checkees() const
+void checkers_network::node::remove_checkee(BPatch_basicBlock* block)
+{
+    block_checkees.erase(block);
+}
+
+bool checkers_network::node::has_checkees() const
+{
+    return !block_checkees.empty();
+}
+
+const checkers_network::node::checkees_collection& checkers_network::node::get_checkees() const
 {
     return block_checkees;
 }
 
-const std::vector<checkers_network::node_type>& checkers_network::node::get_checkers() const
+checkers_network::node::checkees_collection& checkers_network::node::get_checkees()
+{
+    return block_checkees;
+}
+
+const checkers_network::node::checkers_collection& checkers_network::node::get_checkers() const
 {
     return block_checkers;
+}
+
+checkers_network::node::checkers_collection& checkers_network::node::get_checkers()
+{
+    return block_checkers;
+}
+
+bool checkers_network::node::checks_only_block(BPatch_basicBlock* checkee) const
+{
+    auto pos = block_checkees.find(checkee);
+    if (pos == block_checkees.end()) {
+        return false;
+    }
+    return pos->second;
 }
 
 checkers_network::node::node(BPatch_basicBlock* block)
@@ -122,6 +151,16 @@ checkers_network::checkers_network(BPatch_module* m, unsigned conn_level, const 
     , call_graph(module)
     , log(l)
 {
+}
+
+const std::unordered_set<checkers_network::node_type>& checkers_network::get_leaves() const
+{
+    return leaves;
+}
+
+std::unordered_set<checkers_network::node_type>& checkers_network::get_leaves()
+{
+    return leaves;
 }
 
 void checkers_network::build()
@@ -270,7 +309,7 @@ class dot_graph_writer
 {
 public:
     using network_type = std::unordered_map<BPatch_basicBlock*, checkers_network::node_type>;
-    using node_connections = std::vector<checkers_network::node::checkee_data>;
+    using node_connections = checkers_network::node::checkees_collection;
 
 public:
     dot_graph_writer(const network_type& network, const std::string& name, const logger& l);

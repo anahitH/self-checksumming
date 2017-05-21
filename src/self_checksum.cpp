@@ -3,10 +3,42 @@
 #include "checkers_network.h"
 #include "logger.h"
 #include "self_checksum.h"
+#include "snippet_inserter.h"
 
 #include "BPatch.h"
 
+#include <list>
+
 namespace selfchecksum {
+
+namespace {
+void insert_snippets(const std::string& binary_name,
+                     BPatch_binaryEdit* binary,
+                     const logger& log,
+                     checkers_network& network)
+{
+    snippet_inserter inserter(binary_name, binary, log);
+
+    auto& leaves = network.get_leaves();
+    std::list<checkers_network::node_type> checkers_queue;
+    checkers_queue.insert(checkers_queue.begin(), leaves.begin(), leaves.end());
+
+    while (!checkers_queue.empty()) {
+        auto leaf = checkers_queue.back();
+        checkers_queue.pop_back();
+        BPatch_basicBlock* leaf_block = leaf->get_block();
+        auto& checkers = leaf->get_checkers();
+        for (auto& checker : checkers) {
+            inserter.insertAddrHash(checker->get_block(), leaf_block, checker->checks_only_block(leaf_block));
+            checker->remove_checkee(leaf_block);
+            if (!checker->has_checkees()) {
+                checkers_queue.push_front(checker);
+            }
+        }
+    }
+}
+
+}
 
 void self_checksum::run(const std::string& binary_name, const std::string& module_name, unsigned connectivity)
 {
@@ -23,7 +55,9 @@ void self_checksum::run(const std::string& binary_name, const std::string& modul
     }
     checkers_network network(module, connectivity, log);
     network.build();
-    network.dump();
+    //network.dump();
+
+    insert_snippets(binary_name, binary, log, network);
 }
 
 }
@@ -35,7 +69,6 @@ int main(int argc, char* argv[])
         return 1;
     }
     selfchecksum::self_checksum checksum;
-<<<<<<< HEAD
     std::string binary_name(argv[1]);
     std::string module_name(argv[2]);
     unsigned connectivity = atoi(argv[3]);
@@ -47,11 +80,6 @@ int main(int argc, char* argv[])
     //const std::string binary_name("/home/anahitik/TUM_S17/SIP/Introspection/self-checksumming/tests/test");
     //const std::string module_name("test");
     //unsigned connectivity = 2;
-=======
-    const std::string binary_name("/home/djwessel/Documents/sip/self-checksumming/build/testing/test");
-    const std::string module_name("test");
-    unsigned connectivity = 2;
->>>>>>> 539c9ae0c55db441a480bd0012202d4147717b1e
     checksum.run(binary_name, module_name, connectivity);
 
     return 0;

@@ -22,11 +22,14 @@ class checkers_network
 public:
     class node;
     using node_type = std::shared_ptr<node>;
+    using network_type = std::unordered_map<BPatch_basicBlock*, node_type>;
 
     class node
     {
     public:
         using checkee_data = std::pair<BPatch_basicBlock*, bool>;
+        using checkees_collection = std::unordered_map<BPatch_basicBlock*, bool>;
+        using checkers_collection = std::vector<node_type>;
 
      public:
         node() = default;
@@ -36,21 +39,32 @@ public:
         void add_checker(node_type checker);
         void add_checkee(BPatch_basicBlock* block, bool check_checker = true);
 
-        const std::vector<checkee_data>& get_checkees() const;
-        const std::vector<node_type>& get_checkers() const;
+        void remove_checkee(BPatch_basicBlock* block);
+        bool has_checkees() const;
+
+        const checkees_collection& get_checkees() const;
+        const checkers_collection& get_checkers() const;
+
+        checkees_collection& get_checkees();
+        checkers_collection& get_checkers();
+
+        bool checks_only_block(BPatch_basicBlock* checkee) const;
 
     private:
         BPatch_basicBlock* basic_block;
-        std::vector<checkee_data> block_checkees;
-        std::vector<node_type> block_checkers;
+        checkees_collection block_checkees;
+        checkers_collection block_checkers;
     };
 
 public:
     checkers_network(BPatch_module* module, unsigned connectivity_level, const logger& log);
 
 public:
-    void build();
+    const std::unordered_set<node_type>& get_leaves() const;
+    std::unordered_set<node_type>& get_leaves();
 
+public:
+    void build();
     void dump() const;
 
 private:
@@ -67,7 +81,7 @@ private:
     acyclic_call_graph call_graph;
     const logger& log;
     std::unordered_set<node_type> leaves;
-    std::unordered_map<BPatch_basicBlock*, node_type> network;
+    network_type network;
 };
 
 }
