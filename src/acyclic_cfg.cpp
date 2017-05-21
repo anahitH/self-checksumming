@@ -45,7 +45,7 @@ void acyclic_cfg::node::remove_parent(const node_type& parent)
 
 bool acyclic_cfg::node::is_leaf() const
 {
-    return children.empty();
+    return children.size() == 0;
 }
 
 const hash_vector<acyclic_cfg::node_type>& acyclic_cfg::node::get_children() const
@@ -64,6 +64,11 @@ acyclic_cfg::acyclic_cfg(BPatch_function* f)
 {
 }
 
+BPatch_function* acyclic_cfg::get_function()
+{
+    return function;
+}
+
 const std::unordered_set<acyclic_cfg::node_type>& acyclic_cfg::get_leaves() const
 {
     return leaves;
@@ -77,7 +82,6 @@ std::unordered_set<acyclic_cfg::node_type>& acyclic_cfg::get_leaves()
 void acyclic_cfg::build()
 {
     BPatch_flowGraph* cfg = function->getCFG();
-    cfg->fillPostDominatorInfo();
     BPatch_Vector<BPatch_basicBlock*> entry_blocks;
     if (!cfg->getEntryBasicBlock(entry_blocks)) {
         // log message
@@ -85,32 +89,42 @@ void acyclic_cfg::build()
     }
     assert(entry_blocks.size() == 1);
     std::vector<BPatch_basicBlock*> to_process;
-    std::unordered_map<BPatch_basicBlock*, node_type> processed;
+    std::unordered_map<BPatch_basicBlock*, node_type> block_nodes;
 
     to_process.insert(to_process.begin(), entry_blocks.begin(), entry_blocks.end());
     while (!to_process.empty()) {
         BPatch_basicBlock* block = to_process.back();
         to_process.pop_back();
         node_type block_node(new node(block));
-        processed[block] = block_node;
-         
+        auto res = block_nodes.insert(std::make_pair(block, block_node));
+        if (!res.second) {
+            block_node = res.first->second;
+        } else {
+            leaves.insert(block_node);
+        }
         BPatch_Set<BPatch_basicBlock*> dominates;
         block->getAllDominates(dominates);
-        for (const auto& dom : dominates) {
+        // e.g. control flow with a single block.
+        if (dominates.size() == 1) {
+            assert(*dominates.begin() == block);
+            continue;
+        }
+        for (auto& dom : dominates) {
             if (dom == block) {
                 continue;
             }
-            auto pos = processed.find(dom);
-            if (pos == processed.end()) {
-                node_type post_node(new node(dom));
+            auto res = block_nodes.insert(std::make_pair(dom, node_type(new node(dom))));
+            auto post_node = res.first->second;
+            if (res.second) {
                 post_node->add_parent(block_node);
-                to_process.insert(to_process.begin(), dom);
                 block_node->add_child(post_node);
+                to_process.insert(to_process.begin(), dom);
                 leaves.insert(post_node);
-            } else if (dom->postdominates(block)) {
-                pos->second->add_parent(block_node);
-                block_node->add_child(pos->second);
-                leaves.erase(pos->second);
+                leaves.erase(block_node);
+            } else if (!dom->postdominates(block)) {
+                post_node->add_parent(block_node);
+                block_node->add_child(post_node);
+                leaves.erase(block_node);
             }
         }
     }

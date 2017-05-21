@@ -6,6 +6,7 @@
 #include "BPatch.h"
 #include "BPatch_addressSpace.h"
 #include "BPatch_basicBlock.h"
+#include "BPatch_flowGraph.h"
 #include "BPatch_function.h"
 #include "BPatch_image.h"
 #include "BPatch_module.h"
@@ -13,6 +14,9 @@
 #include <ctime>
 #include <cstdlib>
 #include <list>
+#include <iostream>
+#include <fstream>
+#include <sstream>
 
 namespace selfchecksum {
 
@@ -24,13 +28,16 @@ basic_blocks_collection choose_checkers(BPatch_basicBlock* block, const basic_bl
     return basic_blocks_collection();
 }
 
-std::unordered_set<acyclic_cfg::node_type> get_random_nodes(const hash_vector<acyclic_cfg::node_type>& dominators, unsigned number)
+std::unordered_set<BPatch_basicBlock*> get_random_nodes(const hash_vector<BPatch_basicBlock*>& dominators, unsigned number)
 {
+    std::unordered_set<BPatch_basicBlock*> nodes;
+    if (dominators.empty()) {
+        return nodes;
+    }
     srand(time(NULL));
 
     unsigned size = dominators.size();
     number = std::min(size, number);
-    std::unordered_set<acyclic_cfg::node_type> nodes;
     for (unsigned i = 0; i < number;) {
         unsigned index = rand() % size;
         auto n = dominators.get(index);
@@ -42,7 +49,9 @@ std::unordered_set<acyclic_cfg::node_type> get_random_nodes(const hash_vector<ac
     return nodes;
 }
 
-std::unordered_set<BPatch_basicBlock*> get_random_blocks(const hash_vector<BPatch_basicBlock*>& blocks, unsigned number)
+std::unordered_set<BPatch_basicBlock*> get_random_blocks(const hash_vector<BPatch_basicBlock*>& blocks,
+                                                         const std::unordered_set<BPatch_basicBlock*>& except,
+                                                         unsigned number)
 {
     srand(time(NULL));
 
@@ -52,6 +61,9 @@ std::unordered_set<BPatch_basicBlock*> get_random_blocks(const hash_vector<BPatc
     for (unsigned i = 0; i < number;) {
         unsigned index = rand() % size;
         auto n = blocks.get(index);
+        if (except.find(n) != except.end()) {
+            continue;
+        }
         if (!random_blocks.insert(n).second) {
             continue;
         }
@@ -60,23 +72,15 @@ std::unordered_set<BPatch_basicBlock*> get_random_blocks(const hash_vector<BPatc
     return random_blocks;
 }
 
-void detach_node_from_parents(acyclic_cfg::node_type block_node,
-                              hash_vector<acyclic_cfg::node_type>& block_parents,
+void detach_node_from_parents(acyclic_cfg::node_type& block_node,
                               std::list<acyclic_cfg::node_type>& leaves)
 {
+    auto block_parents = block_node->get_parents();
     for (auto& parent : block_parents) {
         parent->remove_child(block_node);
         if (parent->is_leaf()) {
             leaves.push_front(parent);
         }
-    }
-}
-
-void remove_random_blocks(const std::unordered_set<BPatch_basicBlock*>& checker_blocks,
-                          hash_vector<BPatch_basicBlock*>& remaining_blocks)
-{
-    for (const auto& block : checker_blocks) {
-        remaining_blocks.erase(block);
     }
 }
 
@@ -97,6 +101,16 @@ void checkers_network::node::add_checkee(BPatch_basicBlock* block, bool check_ch
     block_checkees.push_back(std::make_pair(block, check_checker));
 }
 
+const std::vector<checkers_network::node::checkee_data>& checkers_network::node::get_checkees() const
+{
+    return block_checkees;
+}
+
+const std::vector<checkers_network::node_type>& checkers_network::node::get_checkers() const
+{
+    return block_checkers;
+}
+
 checkers_network::node::node(BPatch_basicBlock* block)
     : basic_block(block)
 {
@@ -105,42 +119,41 @@ checkers_network::node::node(BPatch_basicBlock* block)
 checkers_network::checkers_network(BPatch_module* m, unsigned conn_level, const logger& l)
     : module(m)
     , connectivity_level(conn_level)
+    , call_graph(module)
     , log(l)
 {
 }
 
 void checkers_network::build()
 {
-    acyclic_call_graph call_graph(module);
     call_graph.build();
+    call_graph.dump();
 
     logger log;
     basic_blocks_collector block_collector(*module, log);
     block_collector.collect();
     auto& all_blocks = block_collector.get_basic_blocks();
 
-    auto& leaf_functions = call_graph.get_leaves();
     std::list<acyclic_call_graph::node_type> function_queue;
     std::unordered_set<acyclic_call_graph::node_type> processed_functions;
-    for (auto& leaf_f : leaf_functions) {
-        if (all_blocks.size() <= connectivity_level) {
+    auto& leaf_functions = call_graph.get_leaves();
+    function_queue.insert(function_queue.begin(), leaf_functions.begin(), leaf_functions.end());
+    while (!function_queue.empty()) {
+        auto function_node = function_queue.back();
+        function_queue.pop_back();
+        if (processed_functions.find(function_node) != processed_functions.end()) {
+            continue;
+        }
+        function_node->build_cfg();
+        auto& function_cfg = function_node->get_cfg();
+        build(function_cfg, all_blocks);
+        processed_functions.insert(function_node);
+
+        const auto& callers = function_node->get_callers();
+        function_queue.insert(function_queue.begin(), callers.begin(), callers.end());
+        if (all_blocks.size() - 1 <= connectivity_level) {
             build_for_remaining_blocks(all_blocks);
             break;
-        }
-        function_queue.push_front(leaf_f);
-        while (!function_queue.empty()) {
-            auto function_node = function_queue.back();
-            if (processed_functions.find(function_node) != processed_functions.end()) {
-                continue;
-            }
-            function_queue.pop_back();
-            function_node->build_cfg();
-            auto& function_cfg = function_node->get_cfg();
-            build(function_cfg, all_blocks);
-            processed_functions.insert(function_node);
-
-            const auto& callers = function_node->get_callers();
-            function_queue.insert(function_queue.begin(), callers.begin(), callers.end());
         }
     }
 }
@@ -149,28 +162,29 @@ void checkers_network::build(acyclic_cfg& function_cfg, basic_blocks_collection&
 {
     std::list<acyclic_cfg::node_type> blocks_queue;
     auto& cfg_leaves = function_cfg.get_leaves();
-    for (auto& leaf : cfg_leaves) {
-        blocks_queue.push_front(leaf);
-        while (!blocks_queue.empty()) {
-            auto block_node = blocks_queue.back();
-            auto res = network.insert(std::make_pair(block_node->get_block(), node_type(new node(block_node->get_block()))));
-            auto check_node = res.first->second;
-            if (res.second) { // newly added
-                leaves.insert(check_node);
-            }
-
-            blocks_queue.pop_back();
-            auto block_dominators = block_node->get_parents();
-            auto checker_nodes = get_random_nodes(block_dominators, connectivity_level);
-            add_dominator_checkers(check_node, checker_nodes);
-            detach_node_from_parents(block_node, block_dominators, blocks_queue);
-            if (checker_nodes.size() < connectivity_level) {
-                unsigned num = connectivity_level - checker_nodes.size();
-                auto checker_blocks = get_random_blocks(remaining_blocks, num);
-                add_random_checkers(check_node, checker_blocks);
-                remove_random_blocks(checker_blocks, remaining_blocks);
-            }
+    blocks_queue.insert(blocks_queue.begin(), cfg_leaves.begin(), cfg_leaves.end());
+    while (!blocks_queue.empty()) {
+        if (remaining_blocks.size() - 1 <= connectivity_level) {
+            break;
         }
+        auto block_node = blocks_queue.back();
+        auto res = network.insert(std::make_pair(block_node->get_block(), node_type(new node(block_node->get_block()))));
+        auto check_node = res.first->second;
+        if (res.second) { // newly added
+            leaves.insert(check_node);
+        }
+
+        blocks_queue.pop_back();
+        remaining_blocks.erase(block_node->get_block());
+        auto block_dominators = get_dominators(block_node);
+        auto checker_nodes = get_random_nodes(block_dominators, connectivity_level);
+        add_dominator_checkers(check_node, checker_nodes);
+        if (checker_nodes.size() < connectivity_level) {
+            unsigned num = connectivity_level - checker_nodes.size();
+            auto checker_blocks = get_random_blocks(remaining_blocks, checker_nodes, num);
+            add_random_checkers(check_node, checker_blocks);
+        }
+        detach_node_from_parents(block_node, blocks_queue);
     }
 }
 
@@ -186,10 +200,10 @@ void checkers_network::build_for_remaining_blocks(hash_vector<BPatch_basicBlock*
 }
 
 void checkers_network::add_dominator_checkers(node_type checkee_node,
-                                              std::unordered_set<acyclic_cfg::node_type>& checkers)
+                                              std::unordered_set<BPatch_basicBlock*>& checkers)
 {
     for (auto& checker : checkers) {
-        auto res = network.insert(std::make_pair(checker->get_block(), node_type(new node(checker->get_block()))));
+        auto res = network.insert(std::make_pair(checker, node_type(new node(checker))));
         auto checker_node = res.first->second;
         checkee_node->add_checker(checker_node);
         checker_node->add_checkee(checkee_node->get_block());
@@ -210,6 +224,200 @@ void checkers_network::add_random_checkers(node_type checkee_node,
     }
 }
 
+hash_vector<BPatch_basicBlock*> checkers_network::get_dominators(acyclic_cfg::node_type block_node)
+{
+    srand(time(NULL));
+    hash_vector<BPatch_basicBlock*> dominators;
+    const auto& parents = block_node->get_parents();
+    for (auto& parent : parents) {
+        dominators.push_back(parent->get_block());
+    }
+
+    BPatch_basicBlock* block = block_node->get_block();
+    BPatch_flowGraph* cfg = block->getFlowGraph();
+    BPatch_function* function = cfg->getFunction();
+    
+    unsigned number_of_tries = rand() % 7;
+    while (dominators.size() < 2 * connectivity_level && number_of_tries-- != 0) {
+        auto function_node = call_graph.get_function_node(function);
+        auto callers = function_node->get_callers();
+        if (callers.empty()) {
+            // no need to continue
+            break;
+        }
+        for (auto& caller : callers) {
+            caller->build_cfg();
+            auto& caller_cfg = caller->get_cfg();
+            auto leaves = caller_cfg.get_leaves();
+            unsigned random_index = rand() % leaves.size();
+            auto iter = leaves.begin();
+            while (random_index-- != 0 && ++iter != leaves.end());
+            assert(iter != leaves.end());
+            auto random_leaf = *iter;
+            dominators.push_back(random_leaf->get_block());
+            auto random_parents = random_leaf->get_parents();
+            for (const auto& random_p : random_parents) {
+                dominators.push_back(random_p->get_block());
+            }
+            function = caller->get_function();
+        }
+    }
+    return dominators;
+}
+
+namespace graph_dump {
+
+class dot_graph_writer
+{
+public:
+    using network_type = std::unordered_map<BPatch_basicBlock*, checkers_network::node_type>;
+    using node_connections = std::vector<checkers_network::node::checkee_data>;
+
+public:
+    dot_graph_writer(const network_type& network, const std::string& name, const logger& l);
+
+    void write();
+
+private:
+    void write_header();
+    void write_node(BPatch_basicBlock* block_node);
+    void write_edges(BPatch_basicBlock* block_node, const node_connections& node_checkees);
+    void write_footer();
+    void finish();
+
+private:
+    std::string create_header() const;
+    std::string create_network_label() const;
+    std::string create_node_label(BPatch_basicBlock* node) const;
+    std::string create_node_id(BPatch_basicBlock* block) const;
+    std::string create_edge_label(const std::string& node1_label, const checkers_network::node::checkee_data& checkee) const;
+
+private:
+    const network_type& network;
+    const std::string& network_name;
+    const logger& log;
+    std::ofstream graph_stream;
+};
+
+dot_graph_writer::dot_graph_writer(const network_type& net, const std::string& name, const logger& l)
+    : network(net)
+    , network_name(name)
+    , log(l)
+{
+}
+
+void dot_graph_writer::write()
+{
+    graph_stream.open(network_name + ".dot");
+    if (!graph_stream.is_open()) {
+        log.log_error("Can not open file for writing the graph\n");
+        return;
+    }
+    write_header();
+    for (const auto& node : network) {
+        write_node(node.first);
+        write_edges(node.first, node.second->get_checkees());
+    }
+    write_footer();
+    finish();
+}
+
+void dot_graph_writer::write_header()
+{
+    const std::string& header_label = create_header();
+    graph_stream << header_label << std::endl;
+}
+
+void dot_graph_writer::write_node(BPatch_basicBlock* block_node)
+{
+    const std::string& node_label = create_node_label(block_node);
+    graph_stream << "\t" << node_label << std::endl;
+}
+
+void dot_graph_writer::write_edges(BPatch_basicBlock* block_node, const node_connections& node_checkees)
+{
+    const std::string& node_id = create_node_id(block_node);
+    for (const auto& checkee : node_checkees) {
+        const std::string& connection = create_edge_label(node_id, checkee);
+        graph_stream << "\t" << connection << std::endl;
+    }
+}
+
+void dot_graph_writer::write_footer()
+{
+    graph_stream << "}";
+}
+
+void dot_graph_writer::finish()
+{
+    graph_stream.close();
+}
+
+std::string dot_graph_writer::create_header() const
+{
+    std::ostringstream header;
+    header << "digraph ";
+    const auto& graph_label = create_network_label();
+    header << graph_label;
+    header << " {\n";
+    header << "\t";
+    header << "label=";
+    header << graph_label;
+    header << ";\n";
+    return header.str();
+}
+
+std::string dot_graph_writer::create_network_label() const
+{
+    return std::string("\"checkers network for module \'" + network_name + "\'\"");
+}
+
+std::string dot_graph_writer::create_node_label(BPatch_basicBlock* node) const
+{
+    // nodeid [shape=record, label="function name  nodeid"];
+    BPatch_flowGraph* fg = node->getFlowGraph();
+    const std::string& function_name = fg->getFunction()->getName();
+
+    std::ostringstream node_label;
+    node_label << create_node_id(node);
+    node_label << " [shape=record,label=\"{";
+    node_label << function_name << " block " << node->getBlockNumber();
+    node_label << "}\"";
+    node_label << "];";
+    return node_label.str();
+}
+
+std::string dot_graph_writer::create_node_id(BPatch_basicBlock* block) const
+{
+    std::ostringstream id;
+    id << "block" << block->getBlockNumber();
+    return id.str();
+}
+
+std::string dot_graph_writer::create_edge_label(const std::string& node1_label,
+                                                const checkers_network::node::checkee_data& checkee) const
+{
+    std::ostringstream label;
+    label << node1_label << " -> ";
+    label << create_node_id(checkee.first);
+    if (!checkee.second) {
+        label << " [color=\"red\"];";
+    }
+    return label.str();
+}
+
+}
+
+void checkers_network::dump() const
+{
+    char* buffer = new char[100];
+    module->getName(buffer, 100);
+    std::string module_name(buffer);
+
+    graph_dump::dot_graph_writer graph_writer(network, module_name, log);
+    graph_writer.write();
+    delete buffer;
+}
 
 }
 

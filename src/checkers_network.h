@@ -36,6 +36,9 @@ public:
         void add_checker(node_type checker);
         void add_checkee(BPatch_basicBlock* block, bool check_checker = true);
 
+        const std::vector<checkee_data>& get_checkees() const;
+        const std::vector<node_type>& get_checkers() const;
+
     private:
         BPatch_basicBlock* basic_block;
         std::vector<checkee_data> block_checkees;
@@ -48,15 +51,20 @@ public:
 public:
     void build();
 
+    void dump() const;
+
 private:
     void build(acyclic_cfg& function_cfg, basic_blocks_collection& remaining_blocks);
     void build_for_remaining_blocks(hash_vector<BPatch_basicBlock*>& all_blocks);
-    void add_dominator_checkers(node_type checkee_node, std::unordered_set<acyclic_cfg::node_type>& checkers);
+    void add_dominator_checkers(node_type checkee_node, std::unordered_set<BPatch_basicBlock*>& checkers);
     void add_random_checkers(node_type checkee_node, std::unordered_set<BPatch_basicBlock*>& checker_blocks, bool check_checker = true);
+    hash_vector<BPatch_basicBlock*> get_dominators(acyclic_cfg::node_type block_node);
+
 
 private:
     BPatch_module* module;
     unsigned connectivity_level;
+    acyclic_call_graph call_graph;
     const logger& log;
     std::unordered_set<node_type> leaves;
     std::unordered_map<BPatch_basicBlock*, node_type> network;

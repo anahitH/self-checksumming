@@ -57,6 +57,11 @@ void acyclic_call_graph::node::add_callee(BPatch_function* callee)
     callees.insert(callee);
 }
 
+bool acyclic_call_graph::node::is_leaf() const
+{
+    return callees.empty();
+}
+
 acyclic_call_graph::acyclic_call_graph(BPatch_module* m)
     : module(m)
 {
@@ -72,6 +77,20 @@ std::unordered_set<acyclic_call_graph::node_type>& acyclic_call_graph::get_leave
     return leaves;
 }
 
+const acyclic_call_graph::node_type& acyclic_call_graph::get_function_node(BPatch_function* function) const
+{
+    auto pos = function_nodes.find(function);
+    assert(pos != function_nodes.end());
+    return pos->second;
+}
+
+acyclic_call_graph::node_type& acyclic_call_graph::get_function_node(BPatch_function* function)
+{
+    auto pos = function_nodes.find(function);
+    assert(pos != function_nodes.end());
+    return pos->second;
+}
+
 void acyclic_call_graph::build()
 {
     std::vector<BPatch_function*>* functions_p = module->getProcedures();
@@ -82,45 +101,49 @@ void acyclic_call_graph::build()
 
     while (!functions.empty()) {
         auto function = functions.back();
+
         functions.pop_back();
-        node_type f_node(new node(function));
-        auto res = function_nodes.insert(std::make_pair(function, f_node));
-        if (!res.second) {
-            f_node = res.first->second;
-        }
+        auto res = function_nodes.insert(std::make_pair(function, node_type(new node(function))));
+        node_type f_node = res.first->second;
 
         BPatch_Vector<BPatch_point*> points;
         function->getCallPoints(points);
         if (points.empty()) {
             leaves.insert(f_node);
+            continue;
         }
-        points.clear();
-        function->getCallerPoints(points);
-        for (const auto& callPoint : points) {
-            BPatch_function* callF = callPoint->getFunction();
-            if (f_node->has_callee(callF)) {
-                // cycle
+        for (auto call_point : points) {
+            auto f = call_point->getCalledFunction();
+            if (f == nullptr || f == function || f->getModule() != module || !f->isInstrumentable()) {
                 continue;
             }
-            auto pos = function_nodes.find(callF);
-            node_type call_node;
-            if (pos != function_nodes.end()) {
-                call_node = pos->second;
-            } else {
-                call_node = node_type(new node(callF));
-                function_nodes.insert(std::make_pair(callF, call_node));
+            auto res = function_nodes.insert(std::make_pair(f, node_type(new node(f))));
+            node_type callee_node = res.first->second;
+            if (callee_node->has_callee(function)) {
+                //cycle
+                continue;
             }
-            f_node->add_caller(call_node);
-            call_node->add_callee(function);
+            f_node->add_callee(f);
+            assert(leaves.find(f_node) == leaves.end());
+            callee_node->add_caller(f_node);
+        }
+        if (f_node->is_leaf()) {
+            leaves.insert(f_node);
         }
     }
 }
 
 void acyclic_call_graph::dump() const
 {
-    unsigned level = 0;
-    for (const auto& n : leaves) {
-        dump(n, level);
+    for (const auto& n : function_nodes) {
+        std::cout << n.first->getName() << "\n";
+        for (const auto& caller : n.second->get_callers()) {
+            std::cout << "      " << caller->get_function()->getName() << "\n";
+        }
+    }
+    std::cout << "Leaves:\n";
+    for (const auto& leaf : leaves) {
+        std::cout << leaf->get_function()->getName() << "\n";
     }
 }
 

@@ -1,11 +1,8 @@
 #include <iostream>
 
-#include "basic_blocks_collector.h"
+#include "checkers_network.h"
 #include "logger.h"
 #include "self_checksum.h"
-
-#include "acyclic_call_graph.h"
-#include "acyclic_cfg.h"
 
 #include "BPatch.h"
 
@@ -24,36 +21,30 @@ void self_checksum::run(const std::string& binary_name, const std::string& modul
     if (module == nullptr) {
         return;
     }
-    std::vector<BPatch_function*> functions = *module->getProcedures();
-    for (const auto& f : functions) {
-        acyclic_cfg cfg(f);
-        cfg.build();
-        cfg.dump();
-        std::cout << "------------------\n";
-    }
-
-    //acyclic_call_graph call_graph;
-    //call_graph.create(module);
-    //call_graph.dump();
-
-    //selfchecksum::basic_blocks_collector collector(*binary, module_name, log);
-    //collector.collect();
-    //collector.dump();
+    checkers_network network(module, connectivity, log);
+    network.build();
+    network.dump();
 }
 
 }
 
 int main(int argc, char* argv[])
 {
-    if (argc != 3) {
+    if (argc != 4) {
         std::cerr << "Wrong number of arguments\n";
         return 1;
     }
     selfchecksum::self_checksum checksum;
-    //std::string binary_name(argv[2]);
+    //std::string binary_name(argv[1]);
+    //std::string module_name(argv[2]);
+    //unsigned connectivity = atoi(argv[3]);
+    //std::string mesage("Creating network graph for executable: " + binary_name
+    //                + ", module: " + module_name
+    //                + ", connectivity level: " + std::to_string(connectivity));
+
+    //std::cout << mesage << "\n";
     const std::string binary_name("/home/anahitik/TUM_S17/SIP/Introspection/self-checksumming/tests/test");
     const std::string module_name("test");
-    //unsigned connectivity = atoi(argv[1]);
     unsigned connectivity = 2;
     checksum.run(binary_name, module_name, connectivity);
 
