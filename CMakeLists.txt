@@ -8,4 +8,5 @@ link_directories(${DYNINST_LIBRARY})
 include_directories(${DYNINST_INCLUDE})
 
 add_subdirectory(src)  # Use your pass name here.
+add_subdirectory(testing)  # Use your pass name here.
 

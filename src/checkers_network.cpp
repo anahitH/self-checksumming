@@ -127,7 +127,6 @@ checkers_network::checkers_network(BPatch_module* m, unsigned conn_level, const 
 void checkers_network::build()
 {
     call_graph.build();
-    call_graph.dump();
 
     logger log;
     basic_blocks_collector block_collector(*module, log);

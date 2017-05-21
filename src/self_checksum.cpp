@@ -35,17 +35,17 @@ int main(int argc, char* argv[])
         return 1;
     }
     selfchecksum::self_checksum checksum;
-    //std::string binary_name(argv[1]);
-    //std::string module_name(argv[2]);
-    //unsigned connectivity = atoi(argv[3]);
+    std::string binary_name(argv[1]);
+    std::string module_name(argv[2]);
+    unsigned connectivity = atoi(argv[3]);
     //std::string mesage("Creating network graph for executable: " + binary_name
     //                + ", module: " + module_name
     //                + ", connectivity level: " + std::to_string(connectivity));
 
     //std::cout << mesage << "\n";
-    const std::string binary_name("/home/anahitik/TUM_S17/SIP/Introspection/self-checksumming/tests/test");
-    const std::string module_name("test");
-    unsigned connectivity = 2;
+    //const std::string binary_name("/home/anahitik/TUM_S17/SIP/Introspection/self-checksumming/tests/test");
+    //const std::string module_name("test");
+    //unsigned connectivity = 2;
     checksum.run(binary_name, module_name, connectivity);
 
     return 0;
