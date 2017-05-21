@@ -16,6 +16,7 @@ public:
     ~snippet_inserter();
 
 public:
+    void insertAddrHash(BPatch_basicBlock *checker, BPatch_basicBlock *target, BPatch_image *appImage);
     void insert(const std::string& binary_name);
 
 private:
@@ -37,6 +38,46 @@ snippet_inserter::~snippet_inserter() {
     }
     delete binary;
     binary = nullptr;
+}
+
+void snippet_inserter::insertAddrHash(BPatch_basicBlock *checker, BPatch_basicBlock *target, BPatch_image *appImage)
+{
+    unsigned long h = 0xabcdabcd;
+    // Snippet seq for Adder hash.
+    BPatch_Vector<BPatch_snippet*> hashSeq;
+    // Create variables
+    BPatch_variableExpr *hash = binary->malloc(*appImage->findType("unsigned long"));
+    BPatch_variableExpr *startAddr = binary->malloc(*appImage->findType("unsigned long"));
+    BPatch_variableExpr *endAddr = binary->malloc(*appImage->findType("unsigned long"));
+
+    // Initialize variables
+    hashSeq.push_back(new BPatch_arithExpr(BPatch_assign, *hash, BPatch_constExpr(h)));
+    //hashSeq.push_back(new BPatch_arithExpr(BPatch_assign, *startAddr, BPatch_constExpr(target->getStartAddress())));
+    //hashSeq.push_back(new BPatch_arithExpr(BPatch_assign, *endAddr, BPatch_constExpr(target->getEndAddress())));
+    hashSeq.push_back(new BPatch_arithExpr(BPatch_assign, *startAddr, BPatch_constExpr(h)));
+    hashSeq.push_back(new BPatch_arithExpr(BPatch_assign, *endAddr, BPatch_constExpr(h)));
+    printf("%lx\n", target->getEndAddress());
+    // while cond (startAddr < endAddr)
+    BPatch_boolExpr whileCond(BPatch_lt, *startAddr, *endAddr);
+    // While seq
+    BPatch_Vector<BPatch_snippet*> whileSeq;
+    // change constExpr to value at addr
+    whileSeq.push_back(new BPatch_arithExpr(BPatch_assign, 
+      *hash, 
+      BPatch_arithExpr(BPatch_plus, 
+        *hash, 
+        BPatch_arithExpr(BPatch_deref, *startAddr))));
+    whileSeq.push_back(new BPatch_arithExpr(BPatch_assign, 
+      *startAddr, 
+      BPatch_arithExpr(BPatch_plus, *startAddr, BPatch_constExpr(1))));
+
+    // Run hash while loop
+    hashSeq.push_back(new BPatch_whileExpr(whileCond, BPatch_sequence(whileSeq)));
+    // check if hash == expected, change nullExpr to response
+    hashSeq.push_back(new BPatch_ifExpr(BPatch_boolExpr(BPatch_ne, *hash, BPatch_constExpr(h)), BPatch_nullExpr()));
+
+    // Change to use correct points
+    binary->insertSnippet(BPatch_sequence(hashSeq), *checker->findEntryPoint());
 }
 
 void snippet_inserter::insert(const std::string& bin_name)
@@ -66,10 +107,17 @@ void snippet_inserter::insert(const std::string& bin_name)
     std::vector<Dyninst::InstructionAPI::Instruction::Ptr> insts, insts2, insts3;
     std::set<BPatch_basicBlock*> blocks;
     cfg->getAllBasicBlocks(blocks);
+    BPatch_basicBlock *firstBB;
+
+    for (auto& bb : blocks) {
+      firstBB = bb;
+      break;
+    }
 
     // Inst add hash
     for (auto& bb : blocks) {
-        h = 0;
+        this->insertAddrHash(firstBB, bb, appImage);
+        /*h = 0;
         bb->getInstructions(insts);
         for (auto& inst : insts) {
             for (int i = 0; i < inst->size(); i++) {
@@ -79,43 +127,11 @@ void snippet_inserter::insert(const std::string& bin_name)
             }
         }
         printf("hash: %lx\n", h);
-
-        // Snippet seq for Adder hash.
-        BPatch_Vector<BPatch_snippet*> hashSeq;
-        // Create variables
-        BPatch_variableExpr *hash = binary->malloc(*appImage->findType("unsigned long"));
-        BPatch_variableExpr *startAddr = binary->malloc(*appImage->findType("unsigned long"));
-        BPatch_variableExpr *endAddr = binary->malloc(*appImage->findType("unsigned long"));
-
-        // Initialize variables
-        hashSeq.push_back(new BPatch_arithExpr(BPatch_assign, *hash, BPatch_constExpr(0)));
-        hashSeq.push_back(new BPatch_arithExpr(BPatch_assign, *startAddr, BPatch_constExpr(bb->getStartAddress())));
-        hashSeq.push_back(new BPatch_arithExpr(BPatch_assign, *endAddr, BPatch_constExpr(bb->getEndAddress())));
-        // while cond (startAddr < endAddr)
-        BPatch_boolExpr whileCond(BPatch_lt, *startAddr, *endAddr);
-        // While seq
-        BPatch_Vector<BPatch_snippet*> whileSeq;
-        // change constExpr to value at addr
-        whileSeq.push_back(new BPatch_arithExpr(BPatch_assign, 
-          *hash, 
-          BPatch_arithExpr(BPatch_plus, 
-            *hash, 
-            BPatch_arithExpr(BPatch_deref, *startAddr))));
-        whileSeq.push_back(new BPatch_arithExpr(BPatch_assign, 
-          *startAddr, 
-          BPatch_arithExpr(BPatch_plus, *startAddr, BPatch_constExpr(8))));
-
-        // Run hash while loop
-        hashSeq.push_back(new BPatch_whileExpr(whileCond, BPatch_sequence(whileSeq)));
-        // check if hash == expected, change nullExpr to response
-        hashSeq.push_back(new BPatch_ifExpr(BPatch_boolExpr(BPatch_ne, *hash, BPatch_constExpr(h)), BPatch_nullExpr()));
-
-        // Change to use correct points
-        binary->insertSnippet(BPatch_sequence(hashSeq), *bb->findEntryPoint());
+*/
     }
 
     // Inst xor hash
-    for (auto& bb : blocks) {
+    /*for (auto& bb : blocks) {
         h = 0;
         int j = 0;
         bb->getInstructions(insts2);
@@ -128,16 +144,17 @@ void snippet_inserter::insert(const std::string& bin_name)
             }
         }
         printf("hash: %lx\n", h);
-    }
+    }*/
 
 
-
+/*
     // Create a counter var
-    //BPatch_variableExpr *intCounter = binary->malloc(*appImage->findType("int"));
+    BPatch_variableExpr *intCounter = binary->malloc(*appImage->findType("int"));
     // Create arithmetic expression
-    //BPatch_arithExpr addOne(BPatch_assign, *intCounter, BPatch_arithExpr(BPatch_plus, *intCounter, BPatch_constExpr(1)));
+    BPatch_arithExpr addOne(BPatch_assign, *intCounter, BPatch_arithExpr(BPatch_plus, *intCounter, BPatch_constExpr(1)));
     // Insert into binary
-    //binary->insertSnippet(addOne, *points);
+    binary->insertSnippet(addOne, *points);
+*/
 }
 
 int main()
