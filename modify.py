@@ -17,7 +17,7 @@ def hashXOR(mm, block):
     mm.seek(start, os.SEEK_SET)
     val = struct.unpack('<L', mm.read(4))[0]
     h = h ^ val
-    start += 4 # TODO: check if right add amount
+    start += 1 
 
   print 'XOR: ', h
   return h
@@ -36,12 +36,16 @@ def hashAdd(mm, block):
     mm.seek(start, os.SEEK_SET)
     val = struct.unpack('<L', mm.read(4))[0]
     h = (h + val) % 0x10000000000000000
-    start += 1 # TODO: check if right add amount
+    start += 1 
 
   print 'HASH: ', h
   return h
   
-with open('test_modified', 'r+b') as f:
+if len(sys.argv) != 2:
+  print 'Incorrect usage. Expected: python modify.py <binary_file_name>'
+  sys.exit(1)
+
+with open(sys.argv[1], 'r+b') as f:
   mm = mmap.mmap(f.fileno(), 0)
 
   mm.seek(0x3a, os.SEEK_SET)
@@ -49,7 +53,6 @@ with open('test_modified', 'r+b') as f:
 
   # Find Dyninst Section Header
   mm.seek(-40, os.SEEK_END)
-#  shstrtab = ord(mm.read_byte()) + 256 * ord(mm.read_byte())
   shstrtab = struct.unpack('<Q', mm.read(8))[0]
   mm.seek(0, os.SEEK_SET)
   dyninstHeader = mm.size() -1
@@ -134,7 +137,6 @@ with open('test_modified', 'r+b') as f:
       
     blocks.append(block)
 
-  # TODO: make sure this is actually sorting
   blocks = sorted(blocks, key=lambda block: block['blockId'])
 
   print blocks
@@ -162,12 +164,15 @@ with open('test_modified', 'r+b') as f:
       mm.seek(c['end'] + 2, os.SEEK_SET)
       mm.write(struct.pack('<Q', block['endAddr'] - sectionFileOffset + sectionVirtual))
       mm.seek(c['hash'] + 2, os.SEEK_SET)
-      if True: #random.randint(1, 2) == 1:
+      if random.randint(1, 2) == 1:
         # Addr
         #print 'insert addr'
         mm.write(struct.pack('<Q', ha))
-      '''else:
+      else:
         # XOR
         print 'insert XOR'
         mm.write(struct.pack('<Q', hx))
-        '''
+        addr = mm.find(b'\x4c\x03\xd3', c['end'])
+        print addr
+        mm.seek(addr, os.SEEK_SET)
+        mm.write(b'\x49\x31\xda')
