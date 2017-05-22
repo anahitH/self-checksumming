@@ -27,7 +27,7 @@ void insert_snippets(const std::string& binary_name,
     checkers_queue.insert(checkers_queue.begin(), leaves.begin(), leaves.end());
 
     for (auto& node : nodes) {
-        inserter.insertBlockTag(node->get_block(), node->get_order_id());
+        inserter.insertEndCheckTag(node->get_block(), node->get_order_id());
     }
 
     while (!checkers_queue.empty()) {
@@ -44,7 +44,7 @@ void insert_snippets(const std::string& binary_name,
         }
     }
     for (auto& node : nodes) {
-        inserter.insertEndCheckTag(node->get_block(), node->get_order_id());
+        inserter.insertBlockTag(node->get_block(), node->get_order_id());
     }
 }
 
@@ -93,7 +93,7 @@ void self_checksum::run(const std::string& binary_name, const std::string& modul
     printf("Building network\n");
     network.build();
     printf("Dumping network\n");
-    //network.dump(binary_name);
+    network.dump(binary_name);
     printf("Inserting Snippets\n");
     insert_snippets(binary_name, binary, log, network);
 }

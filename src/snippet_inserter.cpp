@@ -39,16 +39,16 @@ snippet_inserter::~snippet_inserter() {
 
 void snippet_inserter::insertBlockTag(BPatch_basicBlock *bb, unsigned long long block_id)
 {
-    unsigned long long tag = 0x44332211;
+    unsigned long long tag = 0x11223344;
     tag = tag ^ (block_id << 4 * 8);
     BPatch_variableExpr *blockId = binary->malloc(*appImage->findType("unsigned long"));
     BPatch_arithExpr save(BPatch_assign, *blockId, BPatch_constExpr(tag));
-    binary->insertSnippet(save, *bb->findExitPoint());
+    binary->insertSnippet(save, *bb->findEntryPoint());
 }
 
 void snippet_inserter::insertEndCheckTag(BPatch_basicBlock *bb, unsigned long long block_id)
 {
-    unsigned long long tag = 0x11223344;
+    unsigned long long tag = 0x44332211;
     tag = tag ^ (block_id << 4 * 8);
     BPatch_variableExpr *blockId = binary->malloc(*appImage->findType("unsigned long"));
     BPatch_arithExpr save(BPatch_assign, *blockId, BPatch_constExpr(tag));
