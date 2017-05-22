@@ -63,8 +63,13 @@ bool acyclic_call_graph::node::is_leaf() const
 }
 
 acyclic_call_graph::acyclic_call_graph(BPatch_module* m)
-    : module(m)
 {
+    modules.insert(m);
+}
+
+acyclic_call_graph::acyclic_call_graph(const modules_collection& m)
+{
+    modules.insert(m.begin(), m.end());
 }
 
 const std::unordered_set<acyclic_call_graph::node_type>& acyclic_call_graph::get_leaves() const
@@ -93,6 +98,13 @@ acyclic_call_graph::node_type& acyclic_call_graph::get_function_node(BPatch_func
 
 void acyclic_call_graph::build()
 {
+    for (const auto& module : modules) {
+        build(module);
+    }
+}
+
+void acyclic_call_graph::build(BPatch_module* module)
+{
     std::vector<BPatch_function*>* functions_p = module->getProcedures();
     if (functions_p == nullptr) {
         return;
@@ -114,7 +126,7 @@ void acyclic_call_graph::build()
         }
         for (auto call_point : points) {
             auto f = call_point->getCalledFunction();
-            if (f == nullptr || f == function || f->getModule() != module || !f->isInstrumentable()) {
+            if (f == nullptr || f == function || modules.find(f->getModule()) == modules.end() || !f->isInstrumentable()) {
                 continue;
             }
             auto res = function_nodes.insert(std::make_pair(f, node_type(new node(f))));
@@ -131,6 +143,7 @@ void acyclic_call_graph::build()
             leaves.insert(f_node);
         }
     }
+
 }
 
 void acyclic_call_graph::dump() const

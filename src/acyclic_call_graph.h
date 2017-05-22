@@ -1,5 +1,6 @@
 #pragma once
 
+#include "definitions.h"
 #include "hash_vector.h"
 #include "acyclic_cfg.h"
 
@@ -43,6 +44,7 @@ public:
 
 public:
     acyclic_call_graph(BPatch_module* m);
+    acyclic_call_graph(const modules_collection& m);
 
 public:
     void build();
@@ -56,10 +58,11 @@ public:
     node_type& get_function_node(BPatch_function* function);
 
 private:
+    void build(BPatch_module* module);
     void dump(const node_type& n, unsigned level) const;
 
 public:
-    BPatch_module* module;
+    std::unordered_set<BPatch_module*> modules;
     std::unordered_set<node_type> leaves;
     std::unordered_map<BPatch_function*, node_type> function_nodes;
 };

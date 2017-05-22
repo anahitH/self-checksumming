@@ -15,10 +15,16 @@
 
 namespace selfchecksum {
 
-basic_blocks_collector::basic_blocks_collector(BPatch_module& m, const logger& l)
-    : module(m)
-    , log(l)
+basic_blocks_collector::basic_blocks_collector(BPatch_module* m, const logger& l)
+    : log(l)
 {
+    modules.push_back(m);
+}
+
+basic_blocks_collector::basic_blocks_collector(const modules_collection& m, const logger& l)
+    : log(l)
+{
+    modules = m;
 }
 
 const basic_blocks_collection& basic_blocks_collector::get_basic_blocks() const
@@ -34,13 +40,23 @@ basic_blocks_collection& basic_blocks_collector::get_basic_blocks()
 
 void basic_blocks_collector::collect()
 {
-    std::vector<BPatch_function*>* functions = module.getProcedures();
-    if (functions == nullptr) {
-        return;
+    char* buffer = new char[100];
+    for (auto& module : modules) {
+        //module->getName(buffer, 100);
+        //std::string module_name(buffer);
+        //log.log_message("Module " + module_name);
+        std::vector<BPatch_function*>* functions = module->getProcedures();
+        if (functions == nullptr) {
+            module->getName(buffer, 100);
+            std::string module_name(buffer);
+            log.log_message("No function for module " + module_name);
+            continue;
+        }
+        for (auto& function : *functions) {
+            collect_from_function(function);
+        }
     }
-    for (auto& function : *functions) {
-        collect_from_function(function);
-    }
+    delete []buffer;
 }
 
 void basic_blocks_collector::collect_from_function(BPatch_function* function)

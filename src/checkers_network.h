@@ -58,6 +58,7 @@ public:
 
 public:
     checkers_network(BPatch_module* module, unsigned connectivity_level, const logger& log);
+    checkers_network(const modules_collection& module, unsigned connectivity_level, const logger& log);
 
 public:
     const std::unordered_set<node_type>& get_leaves() const;
@@ -65,7 +66,7 @@ public:
 
 public:
     void build();
-    void dump() const;
+    void dump(const std::string& network_name) const;
 
 private:
     void build(acyclic_cfg& function_cfg, basic_blocks_collection& remaining_blocks);
@@ -76,7 +77,7 @@ private:
 
 
 private:
-    BPatch_module* module;
+    modules_collection modules;
     unsigned connectivity_level;
     acyclic_call_graph call_graph;
     const logger& log;

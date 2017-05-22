@@ -146,9 +146,17 @@ checkers_network::node::node(BPatch_basicBlock* block)
 }
 
 checkers_network::checkers_network(BPatch_module* m, unsigned conn_level, const logger& l)
-    : module(m)
+    : connectivity_level(conn_level)
+    , call_graph(m)
+    , log(l)
+{
+    modules.push_back(m);
+}
+
+checkers_network::checkers_network(const modules_collection& module, unsigned conn_level, const logger& l)
+    : modules(module)
     , connectivity_level(conn_level)
-    , call_graph(module)
+    , call_graph(modules)
     , log(l)
 {
 }
@@ -168,8 +176,9 @@ void checkers_network::build()
     call_graph.build();
 
     logger log;
-    basic_blocks_collector block_collector(*module, log);
+    basic_blocks_collector block_collector(modules, log);
     block_collector.collect();
+    block_collector.dump();
     auto& all_blocks = block_collector.get_basic_blocks();
 
     std::list<acyclic_call_graph::node_type> function_queue;
@@ -407,7 +416,7 @@ std::string dot_graph_writer::create_header() const
 
 std::string dot_graph_writer::create_network_label() const
 {
-    return std::string("\"checkers network for module \'" + network_name + "\'\"");
+    return std::string("\"checkers network \'" + network_name + "\'\"");
 }
 
 std::string dot_graph_writer::create_node_label(BPatch_basicBlock* node) const
@@ -446,15 +455,10 @@ std::string dot_graph_writer::create_edge_label(const std::string& node1_label,
 
 }
 
-void checkers_network::dump() const
+void checkers_network::dump(const std::string& network_name) const
 {
-    char* buffer = new char[100];
-    module->getName(buffer, 100);
-    std::string module_name(buffer);
-
-    graph_dump::dot_graph_writer graph_writer(network, module_name, log);
+    graph_dump::dot_graph_writer graph_writer(network, network_name, log);
     graph_writer.write();
-    delete buffer;
 }
 
 }

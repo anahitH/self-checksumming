@@ -14,7 +14,8 @@ class logger;
 class basic_blocks_collector
 {
 public:
-    basic_blocks_collector(BPatch_module& module, const logger& log);
+    basic_blocks_collector(BPatch_module* module, const logger& log);
+    basic_blocks_collector(const modules_collection& modules, const logger& log);
 
     basic_blocks_collector(const basic_blocks_collector&) = delete;
     basic_blocks_collector& operator =(const basic_blocks_collector&) = delete;
@@ -32,7 +33,7 @@ private:
     void collect_from_function(BPatch_function* function);
 
 private:
-    BPatch_module& module;
+    modules_collection modules;
     const logger& log;
     basic_blocks_collection basic_blocks;
 }; // class basic_blocks_collector
