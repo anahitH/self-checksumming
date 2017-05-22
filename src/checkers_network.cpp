@@ -90,6 +90,14 @@ BPatch_basicBlock* checkers_network::node::get_block()
 {
     return basic_block;
 }
+unsigned long long checkers_network::node::get_order_id()
+{
+    return order_id;
+}
+void checkers_network::node::set_order_id(unsigned long long id)
+{
+    order_id = id;
+}
 
 void checkers_network::node::add_checker(node_type checker)
 {
@@ -149,6 +157,7 @@ checkers_network::checkers_network(BPatch_module* m, unsigned conn_level, const 
     : connectivity_level(conn_level)
     , call_graph(m)
     , log(l)
+    , block_order(0)
 {
     modules.push_back(m);
 }
@@ -159,6 +168,16 @@ checkers_network::checkers_network(const modules_collection& module, unsigned co
     , call_graph(modules)
     , log(l)
 {
+}
+
+const std::unordered_set<checkers_network::node_type>& checkers_network::get_nodes() const
+{
+    return nodes;
+}
+
+std::unordered_set<checkers_network::node_type>& checkers_network::get_nodes()
+{
+    return nodes;
 }
 
 const std::unordered_set<checkers_network::node_type>& checkers_network::get_leaves() const
@@ -231,6 +250,8 @@ void checkers_network::build(acyclic_cfg& function_cfg, basic_blocks_collection&
             auto checker_blocks = get_random_blocks(remaining_blocks, checker_nodes, num);
             add_random_checkers(check_node, checker_blocks);
         }
+        check_node->set_order_id(block_order++);
+        nodes.insert(check_node);
         detach_node_from_parents(block_node, blocks_queue);
     }
 }
@@ -241,7 +262,10 @@ void checkers_network::build_for_remaining_blocks(hash_vector<BPatch_basicBlock*
         std::unordered_set<BPatch_basicBlock*> checker_blocks(all_blocks.begin(), all_blocks.end());
         checker_blocks.erase(block);
         auto res = network.insert(std::make_pair(block, node_type(new node(block))));
-        add_random_checkers(res.first->second, checker_blocks, false);
+        auto check_node = res.first->second;
+        add_random_checkers(check_node, checker_blocks, false);
+        check_node->set_order_id(block_order++);
+        nodes.insert(check_node);
     }
     all_blocks.clear();
 }

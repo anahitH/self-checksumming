@@ -16,14 +16,9 @@ public:
     ~snippet_inserter();
 
 public:
-    void insertAddrHash(BPatch_basicBlock *checker, BPatch_basicBlock *target, bool check_target_guard = true);
-
-public:
-// testing
-    void insert();
-
-private:
-    //void analise_function(BPatch_function* function);
+    void insertBlockTag(BPatch_basicBlock *bb, unsigned long long block_id);
+    void insertEndCheckTag(BPatch_basicBlock *bb, unsigned long long block_id);
+    void insertAddrHash(BPatch_basicBlock *checker, BPatch_basicBlock *target, unsigned long long block_id, bool check_target_guard = true);
 
 private:
     const std::string& binary_name;

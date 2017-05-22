@@ -36,6 +36,8 @@ public:
         node(BPatch_basicBlock* block);
 
         BPatch_basicBlock* get_block();
+        unsigned long long get_order_id();
+        void set_order_id(unsigned long long id);
         void add_checker(node_type checker);
         void add_checkee(BPatch_basicBlock* block, bool check_checker = true);
 
@@ -54,6 +56,7 @@ public:
         BPatch_basicBlock* basic_block;
         checkees_collection block_checkees;
         checkers_collection block_checkers;
+        unsigned long long order_id;
     };
 
 public:
@@ -61,6 +64,8 @@ public:
     checkers_network(const modules_collection& module, unsigned connectivity_level, const logger& log);
 
 public:
+    const std::unordered_set<node_type>& get_nodes() const;
+    std::unordered_set<node_type>& get_nodes();
     const std::unordered_set<node_type>& get_leaves() const;
     std::unordered_set<node_type>& get_leaves();
 
@@ -82,7 +87,9 @@ private:
     acyclic_call_graph call_graph;
     const logger& log;
     std::unordered_set<node_type> leaves;
+    std::unordered_set<node_type> nodes;
     network_type network;
+    unsigned block_order;
 };
 
 }
