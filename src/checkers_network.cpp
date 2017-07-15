@@ -210,13 +210,21 @@ void checkers_network::build()
         if (processed_functions.find(function_node) != processed_functions.end()) {
             continue;
         }
+        //std::cout << "Processing: " << function_node->get_function()->getName() << "\n";
         function_node->build_cfg();
         auto& function_cfg = function_node->get_cfg();
         build(function_cfg, all_blocks);
         processed_functions.insert(function_node);
 
         const auto& callers = function_node->get_callers();
-        function_queue.insert(function_queue.begin(), callers.begin(), callers.end());
+        for (const auto& caller : callers) {
+            caller->remove_callee(function_node->get_function());
+            if (caller->is_leaf()) {
+                //std::cout << "Now adding caller " << caller->get_function()->getName() << "\n";
+                function_queue.push_front(caller);
+            }
+        }
+        //function_queue.insert(function_queue.begin(), callers.begin(), callers.end());
         if (all_blocks.size() - 1 <= connectivity_level) {
             build_for_remaining_blocks(all_blocks);
             break;

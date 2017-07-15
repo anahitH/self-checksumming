@@ -57,6 +57,11 @@ void acyclic_call_graph::node::add_callee(BPatch_function* callee)
     callees.insert(callee);
 }
 
+void acyclic_call_graph::node::remove_callee(BPatch_function* callee)
+{
+    callees.erase(callee);
+}
+
 bool acyclic_call_graph::node::is_leaf() const
 {
     return callees.empty();

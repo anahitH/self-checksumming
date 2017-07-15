@@ -7,6 +7,7 @@
 #include "snippet_inserter.h"
 
 #include "BPatch.h"
+#include "BPatch_basicBlock.h"
 
 #include <list>
 
@@ -34,6 +35,7 @@ void insert_snippets(const std::string& binary_name,
         auto leaf = checkers_queue.back();
         checkers_queue.pop_back();
         BPatch_basicBlock* leaf_block = leaf->get_block();
+        //std::cout << "Block order: " << leaf->get_order_id() << " block number " << leaf->get_block()->getBlockNumber() << "\n";
         auto& checkers = leaf->get_checkers();
         for (auto& checker : checkers) {
             inserter.insertAddrHash(checker->get_block(), leaf_block, leaf->get_order_id(), checker->checks_only_block(leaf_block));
