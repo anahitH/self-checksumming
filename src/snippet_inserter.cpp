@@ -94,6 +94,29 @@ void snippet_inserter::insertAddrHash(BPatch_basicBlock *checker,
     // Run hash while loop
     hashSeq.push_back(new BPatch_whileExpr(whileCond, BPatch_sequence(whileSeq)));
     // check if hash == expected, change nullExpr to response
+/*
+    BPatch_Vector<BPatch_snippet*> printArgs;
+    BPatch_Vector<BPatch_variableExpr *> stderrVars;
+    if(!checker->getFlowGraph()->getFunction()->findVariable("stderr", stderrVars))
+      printf("cant find stderr\n");
+    printArgs.push_back(stderrVars[0]);
+    printArgs.push_back(new BPatch_constExpr("Bad hash\tblock: %llu\n"));
+    //printArgs.push_back(new BPatch_constExpr("Bad hash\tblock: %llu\thash: %lu\texpected: %lu\n"));
+    printArgs.push_back(new BPatch_constExpr(block_id));
+    //printArgs.push_back(hash);
+    //printArgs.push_back(expected);
+    std::vector<BPatch_function *> printfFuncs;
+    if (appImage->findFunction("fprintf", printfFuncs) == NULL)
+      printf("Cant find fprintf\n");
+    BPatch_funcCallExpr printfCall(*(printfFuncs[0]), printArgs);
+    hashSeq.push_back(new BPatch_ifExpr(BPatch_boolExpr(BPatch_ne, *hash, *expected), printfCall));
+*/
+    /*BPatch_Vector<BPatch_snippet*> exitArgs;
+    exitArgs.push_back(new BPatch_constExpr(block_id));
+    std::vector<BPatch_function *> exitFuncs;
+    if (appImage->findFunction("exit", exitFuncs) == NULL)
+      printf("Cant find fprintf\n");
+    */
     hashSeq.push_back(new BPatch_ifExpr(BPatch_boolExpr(BPatch_ne, *hash, *expected),
                                         BPatch_arithExpr(BPatch_assign, *hash, BPatch_constExpr(0x12345678))));
 

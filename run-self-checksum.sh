@@ -1,6 +1,7 @@
 #!/bin/bash
 
-CHECKSUM_BIN=/usr/local/bin
+#CHECKSUM_BIN=/usr/local/bin
+CHECKSUM_BIN=build/src
 
 binary=$1
 connectivity=$2
