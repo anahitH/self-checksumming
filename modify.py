@@ -69,13 +69,52 @@ with open(sys.argv[1], 'r+b') as f:
   sectionFileOffset = struct.unpack('<Q', mm.read(8))[0]
   sectionSize = struct.unpack('<Q', mm.read(8))[0]
 
-  # Find all locations of checker placeholders
+  blocks = {}
+  index = sectionFileOffset
+  block = {}
+  while index != -1:
+    index = mm.find(b'\x48\xb8\x44\x33\x22\x11', index + 1, mm.size())
+    if index != -1:
+      # -7 to account for saving certain regs
+      start = index - 7
+      block['endAddr'] = start
+      mm.seek(start + 13, os.SEEK_SET)
+      blockId = struct.unpack('<L', mm.read(4))[0]
+      endCheckers = mm.find(b'\x48\xb8\x11\x22\x33\x44', start)
+      block = { 'blockId': blockId, 'startAddr': start, 'endCheckers': endCheckers + 23, 'checkees': [], 'checkers': [] }
+      while index != -1:
+        index = mm.find(b'\x48\xb8\xcd\xab\xcd\xab', index + 1, endCheckers)
+        if index != -1:
+          block['checkees'].append(index)
+      blocks[blockId] = block
+      index = block['endCheckers']
+  block['endAddr'] = sectionFileOffset + sectionSize # TODO: may this needs to be - 1?
+
+  for k in blocks:
+    assert len(blocks[k]['checkees']) % 3 == 0
+
+  for b in blocks.values():
+    for i in range(0, len(b['checkees']), 3):
+      mm.seek(b['checkees'][i] + 6, os.SEEK_SET)
+      tag = struct.unpack('<L', mm.read(4))[0]
+      blockId = tag & 0x7FFFFFFF
+      checkee = blocks[blockId]
+      checkee['noCC'] = tag >= 0x80000000
+      checkee['checkers'].append({'hash': b['checkees'][i], 'start': b['checkees'][i + 1], 'end': b['checkees'][i + 2]})
+      checkee['jmpVirt'] = b['checkees'][i + 2] + 0x26
+    
+  for k in blocks:
+    assert len(blocks[k]['checkers']) == 1
+    
+
+  """# Find all locations of checker placeholders
   locs = []
   index = sectionFileOffset
   while index != -1:
     index = mm.find(b'\x48\xb8\xcd\xab\xcd\xab', index + 1, mm.size())
     if index != -1:
       locs.append(index)
+  
   
   # Find all locations of block placeholders
   blocklocs = []
@@ -85,6 +124,7 @@ with open(sys.argv[1], 'r+b') as f:
     if index != -1:
       # -7 to account for saving certain regs
       blocklocs.append(index - 7)
+  
 
   # Decode Block locations
   blockInfos = []
@@ -98,7 +138,16 @@ with open(sys.argv[1], 'r+b') as f:
       blockInfos[-1]['endAddr'] = l # TODO: may this needs to be - 1?
     blockInfos.append({ 'blockId': blockId, 'startAddr': l, 'endCheckers': endCheckers })
   blockInfos[-1]['endAddr'] = sectionFileOffset + sectionSize # TODO: may this needs to be - 1?
+  
+  #blockInfos = blockInfos[:-8]
 
+  ids = {}
+  for index, b in enumerate(blockInfos):
+    if b['blockId'] in ids:
+      print index, b['startAddr'] + sectionVirtual - sectionFileOffset, ids[b['blockId']]
+    ids[b['blockId']] = b
+  sys.exit(1)
+  blockInfos = ids.values()
 
   # Group locs for same block together
   tags = []
@@ -135,11 +184,14 @@ with open(sys.argv[1], 'r+b') as f:
       block['checkers'].append({'hash': t['locs'][i], 'start': t['locs'][i + 1], 'end': t['locs'][i + 2] })
       block['jmpVirt'] = t['locs'][i + 2] + 0x26
       
-    blocks.append(block)
-
+    blocks.append(block)"""
+  blocks = blocks.values()
+  
   blocks = sorted(blocks, key=lambda block: block['blockId'])
 
-  print blocks
+  for b in blocks:
+    print b
+  #sys.exit(1)
 
   # Walk through blocks, creating checkers and patching values
   for block in blocks:
@@ -148,8 +200,6 @@ with open(sys.argv[1], 'r+b') as f:
     start = (block['endCheckers'] if block['noCC'] else block['startAddr']) - sectionFileOffset + sectionVirtual
     print block['blockId']
     for c in block['checkers']:
-      print c
-      
       response = mm.find(b'\x48\xb8\x78\x56\x34\x12', c['end'])
       print '\t', c['end'], response
       mm.seek(response, os.SEEK_SET)

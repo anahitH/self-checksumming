@@ -28,11 +28,29 @@ void insert_snippets(const std::string& binary_name,
     checkers_queue.insert(checkers_queue.begin(), leaves.begin(), leaves.end());
 
     for (auto& node : nodes) {
-        inserter.insertEndCheckTag(node->get_block(), node->get_order_id());
+        BPatch_basicBlock* node_block = node->get_block();
+        unsigned long long node_id = node->get_order_id();
+        inserter.insertEndCheckTag(node_block, node_id);
+    }
+        
+    for (auto& node : nodes) {
+        BPatch_basicBlock* node_block = node->get_block();
+        unsigned long long node_id = node->get_order_id();
+        auto& checkers = node->get_checkers();
+        for (auto& checker : checkers) {
+            inserter.insertAddrHash(checker->get_block(), node_block, node_id, checker->checks_only_block(node_block));
+        }
+    }
+    for (auto& node : nodes) {
+        BPatch_basicBlock* node_block = node->get_block();
+        unsigned long long node_id = node->get_order_id();
+        inserter.insertBlockTag(node_block, node_id);
     }
 
+/*
     while (!checkers_queue.empty()) {
         auto leaf = checkers_queue.back();
+        printf("%llu\n", leaf->get_order_id());
         checkers_queue.pop_back();
         BPatch_basicBlock* leaf_block = leaf->get_block();
         //std::cout << "Block order: " << leaf->get_order_id() << " block number " << leaf->get_block()->getBlockNumber() << "\n";
@@ -48,6 +66,7 @@ void insert_snippets(const std::string& binary_name,
     for (auto& node : nodes) {
         inserter.insertBlockTag(node->get_block(), node->get_order_id());
     }
+*/
 }
 
 }
