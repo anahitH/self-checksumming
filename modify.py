@@ -123,9 +123,9 @@ with open(sys.argv[1], 'r+b') as f:
       checkee['checkers'].append({'hash': b['checkees'][i], 'start': b['checkees'][i + 1], 'end': b['checkees'][i + 2]})
       checkee['jmpVirt'] = b['checkees'][i + 2] + 0x26
     
-  print 'Verifying internal checker network'
-  for k in blocks:
-    assert len(blocks[k]['checkers']) == 1
+  #print 'Verifying internal checker network'
+  #for k in blocks:
+  #  assert len(blocks[k]['checkers']) == 1
 
   blocks = blocks.values()
   blocks = sorted(blocks, key=lambda block: block['blockId'])
